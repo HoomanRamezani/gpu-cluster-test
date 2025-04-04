@@ -23,7 +23,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}  # uses GitHub token for auth
 
       - name: Build Docker image # step 3: build the Docker image
-        run: docker build -t ghcr.io/${{ github.repository }}:latest .
+        run: docker build -t ghcr.io/hoomanramezani/gpu-cluster-test:latest .
 
       - name: Create volume for test reports # step 4: create a volume for test reports
         run: mkdir -p ./reports
@@ -56,5 +56,5 @@ jobs:
       - name: Push image to GHCR # step 8: push the image to GHCR
         if: steps.check_results.outputs.test_passed == 'true'
         run: |
-          docker push ghcr.io/${{ github.repository }}:latest
-          echo "Image successfully pushed to ghcr.io/${{ github.repository }}:latest" 
+          docker push ghcr.io/hoomanramezani/gpu-cluster-test:latest
+          echo "Image successfully pushed to ghcr.io/hoomanramezani/gpu-cluster-test:latest
