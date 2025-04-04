@@ -30,7 +30,7 @@ jobs:
 
       - name: Run distributed training test # step 5: run the distributed training test
         run: |
-          docker run --gpus all --ipc=host -v $(pwd)/reports:/workspace/reports ghcr.io/${{ github.repository }}:latest
+          docker run --gpus all --ipc=host -v $(pwd)/reports:/workspace/reports ghcr.io/hoomanramezani/gpu-cluster-test:latest
           
       - name: Check test results # step 6: check the test results
         id: check_results
