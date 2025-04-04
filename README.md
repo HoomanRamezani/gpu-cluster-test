@@ -1,194 +1,109 @@
-# Distributed GPU Training Example for Cluster Acceptance Testing
+# GPU Cluster Acceptance Testing
 
-This repository provides a lightweight and portable example of distributed GPU training using PyTorch. It is designed for Cloud/Infrastructure engineers to validate a GPU cluster's multi-GPU training capabilities. 
+This repository provides a portable, lightweight internal test harness for GPU cluster acceptance. It builds a Docker container that performs distributed training using PyTorch DDP on the CIFAR-10 dataset to verify multi-GPU compute environments.
 
 ## Features
+- **GPU Validation**: Checks CUDA availability, tensor ops, and NCCL communication via distributed training  
+- **Image**: Builds a portable container based on nvcr.io/nvidia/pytorch:24.07-py3 that runs the GPU validation test  
+- **CI/CD**: Includes GitHub Actions workflow to build, test, and push the image to GHCR on success
 
-- **Standard Model & Dataset**: Uses a ResNet-18 model (from TorchVision) on the CIFAR-10 dataset – a well-known small image classification benchmark
-- **Distributed Data Parallel Training**: Implements PyTorch's native DDP, which launches one training process per GPU and synchronizes gradients across them
-- **NVIDIA PyTorch Base Image**: Uses `nvcr.io/nvidia/pytorch:24.07-py3` as the base Docker image, with PyTorch, CUDA, cuDNN, and NCCL pre-installed
-- **CI Workflow with GitHub Actions**: Includes an automated GitHub Actions workflow to build the Docker image, run a short multi-GPU training test, and push the image to GitHub Container Registry (GHCR)
-- **Portable & Simple Design**: Self-contained code with minimal dependencies that can be easily extended for different cluster configurations
-- **NVIDIA-SMI Logging**: Automatically captures GPU information via `nvidia-smi` before and after training in structured JSON format
-- **Clear Acceptance Status**: Provides a prominent PASS/FAIL determination at the top of the output
+## What It Tests
 
-## Acceptance Test Validation Criteria
-
-The script includes automated checks to validate GPU cluster functionality across all GPUs:
-
-### Key Validation Tests
-
-1. **GPU Availability & Properties**
-   - Verifies each GPU is accessible via CUDA
-   - Reports GPU model, memory capacity, and CUDA version
-
-2. **Computation Performance**
-   - Tests basic tensor operations on each GPU
-   - Measures time taken for matrix multiplication
-
-3. **Inter-GPU Communication (NCCL)**
-   - Tests communication between GPUs via all_gather operations
-   - Verifies distributed synchronization works correctly
-   - Measures communication latency
-
-4. **Distributed Training**
-   - Tests model initialization and data loading
-   - Runs actual training for configurable number of epochs
-   - Measures training throughput and loss convergence
-   
-5. **NVIDIA-SMI Diagnostics**
-   - Captures GPU name, driver version, temperature, utilization
-   - Logs memory usage and power draw 
-   - Records GPU topology for multi-GPU setups
-   - Compares before/after metrics to detect issues
-
-### Acceptance Criteria
-
-The cluster passes validation if:
-
-- All GPUs are detected and accessible
-- Tensor operations complete successfully on all GPUs
-- NCCL operations complete without errors
-- Training loss decreases over epochs
-- No GPU errors or out-of-memory conditions occur
-- Inter-GPU communication latency is within acceptable bounds
-- NVIDIA-SMI reports normal temperature and utilization profiles
-
-A comprehensive report is generated in JSON format (`reports/cluster_test_report.json`) with detailed metrics and validation results.
+1. **CUDA Device Check**: Ensures GPUs are available via `torch.cuda`
+2. **Tensor Performance**: Measures execution time of `torch.matmul` on GPU
+3. **NCCL Communication**: Tests `all_gather` across GPUs (when available)
+4. **Training Test**: Runs 2 epochs of ResNet18 on CIFAR-10 with DDP
+5. **Diagnostics**: Logs temperature, memory, power, utilization, and topology via `nvidia-smi`
 
 ## Quick Start
 
-### Pull and Run the Container
-
+### 1. **Run from Pre-Built Image** (recommended)
 ```bash
-# Pull the pre-built container
-docker pull ghcr.io/OWNER/REPO:latest
-
-# Run with GPU access
-docker run --rm --gpus all --ipc=host ghcr.io/OWNER/REPO:latest
+docker run --rm --gpus all --ipc=host \
+  -v $(pwd)/reports:/workspace/reports \
+  ghcr.io/HoomanRamezani/gpu-cluster-test:latest
 ```
+> Pulls the validated image from GHCR and runs the distributed GPU test.
 
-### Build from Source
-
+---
+### 2. **Build and Test Locally** (for development/debugging)
 ```bash
-# Clone the repository
-git clone https://github.com/OWNER/REPO.git
-cd REPO
-
-# Build the Docker image
 docker build -t gpu-cluster-test:latest .
 
-# Run with GPU access
-docker run --rm --gpus all --ipc=host gpu-cluster-test:latest
+docker run --rm --gpus all --ipc=host \
+  -v $(pwd)/reports:/workspace/reports \
+  gpu-cluster-test:latest
 ```
+> Builds the container locally using `nvcr.io/nvidia/pytorch:24.07-py3` and runs the test. 
 
-### Run Validation Only
 
-```bash
-# Run just the validation tests without full training
-docker run --rm --gpus all --ipc=host gpu-cluster-test:latest python train.py --validation-only
-```
 
-## Sample Output
+## CI/CD: Automated Test and Push
+1. Builds the Docker image using docker build
+2. Runs the container on available GPU hardware and mounts a local reports/ volume
+3. Validates test success by checking `cluster_test_report.json`
+4. If `"status": "success"`, pushes image to `ghcr.io`
 
-The script displays a clear acceptance status at the top of the output:
 
-```
-==================================================
-FINAL ACCEPTANCE: PASS
-- GPU Available: YES
-- NCCL Communication: PASS
-- Training Status: PASS
-==================================================
-```
-
-Or in case of failure:
-
-```
-==================================================
-FINAL ACCEPTANCE: FAIL
-- GPU Available: YES
-- NCCL Communication: PASS
-- Training Status: FAIL
-- Error: CUDA out of memory
-==================================================
-```
-
-The JSON report also includes this acceptance information:
+## Sample Output Report (`cluster_test_report.json`)
 
 ```json
 {
-  "test_timestamp": "2023-04-01 12:34:56",
-  "world_size": 4,
-  "validation": { /*validation details*/ },
-  "performance": { /*performance details*/ },
+  "test_timestamp": "2025-04-04 03:52:05",
+  "world_size": 1,
+  "validation": {
+    "rank": 0,
+    "status": "passed",
+    "checks": {
+      "gpu_available": true,
+      "gpu_name": "Tesla T4",
+      "gpu_memory_total": 15828320256,
+      "cuda_version": "12.4",
+      "tensor_op_time": 0.347,
+      "tensor_op_success": true
+    },
+    "errors": [],
+    "nvidia_smi": {
+      "gpus": [
+        {
+          "index": 0,
+          "name": "Tesla T4",
+          "driver_version": "550.54.15",
+          "temperature_gpu": "55",
+          "utilization_gpu": "3 %",
+          "memory_used": "134 MiB",
+          "memory_total": "15360 MiB",
+          "power_draw": "27.56 W"
+        }
+      ]
+    }
+  },
+  "performance": {
+    "rank": 0,
+    "epochs": [
+      {
+        "epoch": 1,
+        "avg_loss": 1.58,
+        "time_seconds": 22.47
+      },
+      {
+        "epoch": 2,
+        "avg_loss": 1.23,
+        "time_seconds": 20.38
+      }
+    ],
+    "final_status": "success",
+    "model_init_time": 0.89,
+    "data_load_time": 6.95
+  },
   "status": "success",
   "acceptance": {
     "status": "PASS",
     "summary": [
       "GPU Available: YES",
-      "NCCL Communication: PASS",
+      "NCCL Communication: N/A",
       "Training Status: PASS"
     ]
   }
 }
 ```
-
-## Implementation Details
-
-### Distributed Training
-
-The training script (`train.py`) uses PyTorch's Distributed Data Parallel (DDP) to utilize multiple GPUs:
-
-- Each GPU runs a separate process with its own copy of the model
-- Gradient synchronization happens automatically during backpropagation
-- The CIFAR-10 dataset is partitioned across processes using `DistributedSampler`
-- NCCL is used as the communication backend for optimal GPU-to-GPU performance
-
-### Container Image
-
-The Docker image is based on NVIDIA's PyTorch container:
-
-- Includes PyTorch, CUDA, cuDNN, and NCCL pre-installed and optimized
-- Minimal additional dependencies required (only checks for torchvision)
-- Optimized for multi-GPU training out of the box
-
-### Kubernetes Deployment
-
-The included Kubernetes manifest (`k8s-deployment.yaml`) shows how to deploy the training job in a Kubernetes environment:
-
-```bash
-# Deploy the job to a Kubernetes cluster with GPU support
-kubectl apply -f k8s-deployment.yaml
-
-# Monitor the training job
-kubectl get jobs
-kubectl logs -f job/gpu-cluster-training
-```
-
-## Interpreting NVIDIA-SMI Output
-
-The test captures two NVIDIA-SMI snapshots:
-1. **Before training**: Baseline GPU state
-2. **After training**: Final GPU state after workload
-
-Key metrics to examine:
-- **Temperature**: Should be within normal range (usually below 85°C)
-- **Memory usage**: Training should use significant but not all GPU memory
-- **Utilization**: Should show high utilization during training
-- **GPU Topology**: Shows interconnect type between GPUs (important for multi-GPU performance)
-
-## Customization
-
-You can customize the training by passing arguments:
-
-```bash
-# Run for more epochs with larger batch size
-docker run --rm --gpus all gpu-cluster-test:latest python train.py --epochs 5 --batch-size 128
-```
-
-For more complex configurations, modify the `train.py` file and rebuild the container.
-
-## License
-
-MIT 
