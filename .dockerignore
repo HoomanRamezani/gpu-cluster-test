@@ -1,0 +1,50 @@
+# Git
+.git
+.github
+.gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# Data folders
+data/
+logs/
+*.pt
+runs/
+
+# Kubernetes
+k8s-*.yaml
+
+# Docker
+Dockerfile
+.dockerignore
+
+# Documentation and miscellaneous
+README.md
+LICENSE
+*.md
+docs/ 

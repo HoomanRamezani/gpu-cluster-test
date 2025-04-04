@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main" ] # triggers when code is pushed to the "main" branch
+
+permissions:
+  contents: read
+  packages: write   # allow pushing to GHCR
+
+jobs:
+  build-test-push: # define a job named "build-test-push"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code # step 1: checkout the code
+        uses: actions/checkout@v3
+
+      - name: Log in to GitHub Container Registry # step 2: log in to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}  # uses GitHub token for auth
+
+      - name: Build Docker image # step 3: build the Docker image
+        run: docker build -t ghcr.io/${{ github.repository }}:latest .
+
+      - name: Create volume for test reports # step 4: create a volume for test reports
+        run: mkdir -p ./reports
+
+      - name: Run distributed training test # step 5: run the distributed training test
+        run: |
+          docker run --gpus all --ipc=host -v $(pwd)/reports:/workspace/reports ghcr.io/${{ github.repository }}:latest
+          
+      - name: Check test results # step 6: check the test results
+        id: check_results
+        run: |
+          if [ -f ./reports/cluster_test_report.json ]; then
+            echo "Test report generated successfully"
+            cat ./reports/cluster_test_report.json
+            grep -q '"status": "success"' ./reports/cluster_test_report.json
+            echo "test_passed=true" >> $GITHUB_OUTPUT
+          else
+            echo "Test failed - no report generated"
+            echo "test_passed=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+      - name: Upload test report # step 7: upload the test report
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: gpu-test-report
+          path: ./reports/
+
+      - name: Push image to GHCR # step 8: push the image to GHCR
+        if: steps.check_results.outputs.test_passed == 'true'
+        run: |
+          docker push ghcr.io/${{ github.repository }}:latest
+          echo "Image successfully pushed to ghcr.io/${{ github.repository }}:latest" 
